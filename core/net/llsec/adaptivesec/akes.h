@@ -52,7 +52,7 @@
 #ifdef AKES_CONF_ACK_DELAY
 #define AKES_ACK_DELAY AKES_CONF_ACK_DELAY
 #else /* AKES_CONF_ACK_DELAY */
-#define AKES_ACK_DELAY (20) /* seconds */
+#define AKES_ACK_DELAY (5) /* seconds */
 #endif /* AKES_CONF_ACK_DELAY */
 
 /* Defines the plugged-in scheme */

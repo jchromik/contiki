@@ -42,6 +42,7 @@
 #include "lib/random.h"
 #include "sys/ctimer.h"
 #include "sys/cc.h"
+#include "lib/leaky-bucket.h"
 #include <string.h>
 
 #ifdef AKES_TRICKLE_CONF_IMIN
@@ -62,6 +63,18 @@
 #define REDUNDANCY_CONSTANT 2
 #endif /* AKES_TRICKLE_CONF_REDUNDANCY_CONSTANT */
 
+#ifdef AKES_TRICKLE_CONF_MAX_RESET_RATE
+#define MAX_RESET_RATE AKES_TRICKLE_CONF_MAX_RESET_RATE
+#else /* AKES_TRICKLE_CONF_MAX_RESET_RATE */
+#define MAX_RESET_RATE (10 * 60 * CLOCK_SECOND) /* 1 reset per 10min */
+#endif /* AKES_TRICKLE_CONF_MAX_RESET_RATE */
+
+#ifdef AKES_TRICKLE_CONF_MAX_CONSECUTIVE_RESETS
+#define MAX_CONSECUTIVE_RESETS AKES_TRICKLE_CONF_MAX_CONSECUTIVE_RESETS
+#else /* AKES_TRICKLE_CONF_MAX_CONSECUTIVE_RESETS */
+#define MAX_CONSECUTIVE_RESETS (3)
+#endif /* AKES_TRICKLE_CONF_MAX_CONSECUTIVE_RESETS */
+
 #define DEBUG 0
 #if DEBUG
 #include <stdio.h>
@@ -79,6 +92,7 @@ static uint8_t new_nbrs_count;
 static clock_time_t interval_size;
 static struct ctimer trickle_timer;
 static struct ctimer hello_timer;
+static struct leaky_bucket reset_bucket;
 
 /*---------------------------------------------------------------------------*/
 static clock_time_t
@@ -164,7 +178,7 @@ akes_trickle_on_new_nbr(void)
 {
   PRINTF("akes-trickle: New neighbor\n");
 
-  if(++new_nbrs_count == MAX(akes_nbr_count(AKES_NBR_PERMANENT) / 4, 1)) {
+  if(++new_nbrs_count >= MAX(akes_nbr_count(AKES_NBR_PERMANENT) / 4, 1)) {
     akes_trickle_reset();
   }
 }
@@ -182,6 +196,11 @@ akes_trickle_stop(void)
 void
 akes_trickle_reset(void)
 {
+  if(leaky_bucket_is_full(&reset_bucket)) {
+    PRINTF("akes-trickle: Not resetting Trickle since bucket is full\n");
+    return;
+  }
+
   if(interval_size == IMIN) {
     PRINTF("akes-trickle: Not resetting Trickle since I = I_min\n");
     return;
@@ -189,6 +208,7 @@ akes_trickle_reset(void)
 
   PRINTF("akes-trickle: Resetting Trickle\n");
 
+  leaky_bucket_pour(&reset_bucket, 1);
   ctimer_stop(&trickle_timer);
   interval_size = IMIN / 2;
   on_interval_expired(NULL);
@@ -199,6 +219,7 @@ akes_trickle_start(void)
 {
   PRINTF("akes-trickle: Starting Trickle\n");
 
+  leaky_bucket_init(&reset_bucket, MAX_CONSECUTIVE_RESETS, MAX_RESET_RATE);
   akes_change_hello_challenge();
   interval_size = get_random_time(IMIN, IMIN << IMAX);
   on_timeout(NULL);

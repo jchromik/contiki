@@ -47,7 +47,14 @@
 #include "lib/csprng.h"
 #include "lib/memb.h"
 #include "lib/random.h"
+#include "lib/leaky-bucket.h"
 #include <string.h>
+
+#ifdef AKES_CONF_MAX_HELLOACK_RATE
+#define MAX_HELLOACK_RATE AKES_CONF_MAX_HELLOACK_RATE
+#else /* AKES_CONF_MAX_HELLOACK_RATE */
+#define MAX_HELLOACK_RATE (60 * CLOCK_SECOND) /* 1 HELOACK per 1min */
+#endif /* AKES_CONF_MAX_HELLOACK_RATE */
 
 #define DEBUG 0
 #if DEBUG
@@ -64,6 +71,7 @@ static void send_updateack(struct akes_nbr_entry *entry);
 /* A random challenge, which will be attached to HELLO commands */
 static uint8_t hello_challenge[AKES_NBR_CHALLENGE_LEN];
 static struct cmd_broker_subscription subscription;
+static struct leaky_bucket hello_bucket;
 
 /*---------------------------------------------------------------------------*/
 static void
@@ -170,6 +178,11 @@ on_hello(uint8_t *payload)
 
   PRINTF("akes: Received HELLO\n");
 
+  if(leaky_bucket_is_full(&hello_bucket)) {
+    PRINTF("akes: Bucket is full\n");
+    return CMD_BROKER_ERROR;
+  }
+
   akes_nbr_delete_expired_tentatives();
   entry = akes_nbr_get_sender_entry();
   if(entry && entry->tentative) {
@@ -201,6 +214,9 @@ on_hello(uint8_t *payload)
     PRINTF("akes: HELLO flood?\n");
     return CMD_BROKER_ERROR;
   }
+
+  leaky_bucket_pour(&hello_bucket, 1);
+
   akes_nbr_copy_challenge(entry->tentative->challenge, payload);
   waiting_period = akes_get_random_waiting_period();
   entry->tentative->expiration_time = clock_seconds()
@@ -477,6 +493,7 @@ akes_get_receiver_status(void)
 void
 akes_init(void)
 {
+  leaky_bucket_init(&hello_bucket, AKES_NBR_MAX_TENTATIVES, MAX_HELLOACK_RATE);
   subscription.on_command = on_command;
   cmd_broker_subscribe(&subscription);
   akes_nbr_init();
