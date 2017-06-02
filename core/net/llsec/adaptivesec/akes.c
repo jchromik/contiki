@@ -131,6 +131,14 @@ prepare_update_command(uint8_t cmd_id,
   packetbuf_set_datalen(payload_len);
 }
 /*---------------------------------------------------------------------------*/
+/*
+ * We use AES-128 as a key derivation function (KDF). This is possible due to
+ * simple circumstances. Speaking in terms of the extract-then-expand paradigm
+ * [RFC 5869], we can skip over the extraction step since we already have a
+ * uniformly-distributed key which we want to expand into session keys. For
+ * implementing the expansion step, we may just use AES-128 [Paar and Pelzl,
+ * Understanding Cryptography].
+ */
 static void
 generate_pairwise_key(uint8_t *result, uint8_t *shared_secret)
 {
