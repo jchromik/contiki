@@ -53,6 +53,13 @@
 static struct csprng_seed seed;
 
 /*---------------------------------------------------------------------------*/
+/*
+ * We use output feedback mode (OFB) for generating cryptographic pseudo-random
+ * numbers [RFC 4086]. A potential problem with OFB is that OFB at some point
+ * enters a cycle. However, the expected cycle length given a random key and a
+ * random starting point is about 2^127 in our instantiation [Davies and Parkin,
+ * The Average Cycle Size of The Key Stream in Output  Feedback Encipherment].
+ */
 void
 csprng_rand(uint8_t *result, uint8_t len)
 {
