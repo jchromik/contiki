@@ -78,6 +78,7 @@
 #endif /* AKES_NBR_CONF_WITH_INDICES */
 
 #define AKES_NBR_CHALLENGE_LEN 8
+#define AKES_NBR_CACHED_HELLOACK_CHALLENGE_LEN 2
 
 enum akes_nbr_status {
   AKES_NBR_PERMANENT = 0,
@@ -115,6 +116,9 @@ struct akes_nbr {
       uint8_t group_key[AES_128_KEY_LENGTH];
 #endif /* AKES_NBR_WITH_GROUP_KEYS */
       uint8_t sent_authentic_hello;
+#if !AKES_NBR_WITH_PAIRWISE_KEYS
+      uint8_t helloack_challenge[AKES_NBR_CACHED_HELLOACK_CHALLENGE_LEN];
+#endif /* !AKES_NBR_WITH_PAIRWISE_KEYS */
 #if ANTI_REPLAY_WITH_SUPPRESSION
       uint8_t last_was_broadcast;
 #endif /* ANTI_REPLAY_WITH_SUPPRESSION */

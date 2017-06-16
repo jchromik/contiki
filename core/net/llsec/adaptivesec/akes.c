@@ -67,6 +67,9 @@
 static void send_helloack(void *ptr);
 static void send_ack(struct akes_nbr_entry *entry);
 static void send_updateack(struct akes_nbr_entry *entry);
+#if !AKES_NBR_WITH_PAIRWISE_KEYS
+static void on_ack_sent(void *ptr, int status, int transmissions);
+#endif /* !AKES_NBR_WITH_PAIRWISE_KEYS */
 
 /* A random challenge, which will be attached to HELLO commands */
 static uint8_t hello_challenge[AKES_NBR_CHALLENGE_LEN];
@@ -311,7 +314,7 @@ on_helloack(uint8_t *payload, int p_flag)
 #if AKES_NBR_WITH_PAIRWISE_KEYS
           !memcmp(key, entry->permanent->pairwise_key, AES_128_KEY_LENGTH)) {
 #else /* AKES_NBR_WITH_PAIRWISE_KEYS */
-          entry->tentative && !memcmp(key, entry->tentative->tentative_pairwise_key, AES_128_KEY_LENGTH)) {
+          !memcmp(payload, entry->permanent->helloack_challenge, AKES_NBR_CACHED_HELLOACK_CHALLENGE_LEN)) {
 #endif /* AKES_NBR_WITH_PAIRWISE_KEYS */
 
         PRINTF("akes: Replayed HELLOACK\n");
@@ -341,6 +344,9 @@ on_helloack(uint8_t *payload, int p_flag)
 #if AKES_NBR_WITH_PAIRWISE_KEYS
   akes_nbr_copy_key(entry->permanent->pairwise_key, key);
 #else /* AKES_NBR_WITH_PAIRWISE_KEYS */
+  memcpy(entry->permanent->helloack_challenge,
+      payload,
+      AKES_NBR_CACHED_HELLOACK_CHALLENGE_LEN);
   akes_nbr_new(AKES_NBR_TENTATIVE);
   if(!entry->tentative) {
     akes_nbr_delete(entry, AKES_NBR_PERMANENT);
@@ -364,8 +370,23 @@ send_ack(struct akes_nbr_entry *entry)
 {
   PRINTF("akes: Sending ACK\n");
   prepare_update_command(AKES_ACK_IDENTIFIER, entry, AKES_NBR_PERMANENT);
+#if AKES_NBR_WITH_PAIRWISE_KEYS
   adaptivesec_send_command_frame();
+#else /* AKES_NBR_WITH_PAIRWISE_KEYS */
+  NETSTACK_MAC.send(on_ack_sent, entry);
+#endif /* AKES_NBR_WITH_PAIRWISE_KEYS */
 }
+/*---------------------------------------------------------------------------*/
+#if !AKES_NBR_WITH_PAIRWISE_KEYS
+static void
+on_ack_sent(void *ptr, int status, int transmissions)
+{
+  struct akes_nbr_entry *entry;
+
+  entry = ptr;
+  akes_nbr_delete(entry, AKES_NBR_TENTATIVE);
+}
+#endif /* !AKES_NBR_WITH_PAIRWISE_KEYS */
 /*---------------------------------------------------------------------------*/
 static enum cmd_broker_result
 on_ack(uint8_t *payload)
