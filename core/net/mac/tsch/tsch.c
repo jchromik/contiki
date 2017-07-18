@@ -57,6 +57,10 @@
 #include "net/mac/mac-sequence.h"
 #include "lib/random.h"
 
+int sftiot_radio_on = 0;
+long sftiot_radio_duration = 0;
+static clock_time_t sftiot_radio_on_since;
+
 #if FRAME802154_VERSION < FRAME802154_IEEE802154E_2012
 #error TSCH: FRAME802154_VERSION must be at least FRAME802154_IEEE802154E_2012
 #endif
@@ -639,6 +643,10 @@ PT_THREAD(tsch_scan(struct pt *pt))
     }
 
     /* Turn radio on and wait for EB */
+    if(!sftiot_radio_on) {
+      sftiot_radio_on = 1;
+      sftiot_radio_on_since = clock_time();
+    }
     NETSTACK_RADIO.on();
 
     is_packet_pending = NETSTACK_RADIO.pending_packet();
@@ -658,6 +666,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
       /* Parse EB and attempt to associate */
       PRINTF("TSCH: association: received packet (%u bytes) on channel %u\n", packetbuf_datalen(), current_channel);
+      PRINTF("SFTIOT: Radio was on %lu ticks.\n", sftiot_radio_duration + (clock_time() - sftiot_radio_on_since));
 
       tsch_associate(t0);
     }
@@ -665,6 +674,10 @@ PT_THREAD(tsch_scan(struct pt *pt))
     if(tsch_is_associated) {
       /* End of association, turn the radio off */
       NETSTACK_RADIO.off();
+      if(sftiot_radio_on) {
+        sftiot_radio_on = 0;
+        sftiot_radio_duration += clock_time() - sftiot_radio_on_since;
+      }
     } else if(!tsch_is_coordinator) {
       /* Go back to scanning */
       etimer_reset(&scan_timer);
@@ -983,9 +996,17 @@ static int
 turn_off(int keep_radio_on)
 {
   if(keep_radio_on) {
+    if(!sftiot_radio_on) {
+      sftiot_radio_on = 1;
+      sftiot_radio_on_since = clock_time();
+    }
     NETSTACK_RADIO.on();
   } else {
     NETSTACK_RADIO.off();
+    if(sftiot_radio_on) {
+      sftiot_radio_on = 0;
+      sftiot_radio_duration += clock_time() - sftiot_radio_on_since;
+    }
   }
   return 1;
 }
