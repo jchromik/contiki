@@ -461,7 +461,7 @@ tsch_associate(rtimer_clock_t timestamp)
     return 0;
   }
 #endif /* TSCH_JOIN_SECURED_ONLY */
-  
+
 #if LLSEC802154_ENABLED
   if(!tsch_security_parse_frame(packetbuf_hdrptr(), hdrlen,
       packetbuf_totlen() - hdrlen - tsch_security_mic_len(),
@@ -645,7 +645,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
     /* Turn radio on and wait for EB */
     if(!sftiot_radio_on) {
       sftiot_radio_on = 1;
-      sftiot_radio_on_since = clock_time();
+      sftiot_radio_on_since = RTIMER_NOW();
     }
     NETSTACK_RADIO.on();
 
@@ -666,7 +666,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
 
       /* Parse EB and attempt to associate */
       PRINTF("TSCH: association: received packet (%u bytes) on channel %u\n", packetbuf_datalen(), current_channel);
-      PRINTF("SFTIOT: Radio was on %lu ticks.\n", sftiot_radio_duration + (clock_time() - sftiot_radio_on_since));
+      PRINTF("SFTIOT: Radio was on %lu ticks.\n", sftiot_radio_duration + (RTIMER_NOW() - sftiot_radio_on_since));
 
       tsch_associate(t0);
     }
@@ -676,7 +676,7 @@ PT_THREAD(tsch_scan(struct pt *pt))
       NETSTACK_RADIO.off();
       if(sftiot_radio_on) {
         sftiot_radio_on = 0;
-        sftiot_radio_duration += clock_time() - sftiot_radio_on_since;
+        sftiot_radio_duration += RTIMER_NOW() - sftiot_radio_on_since;
       }
     } else if(!tsch_is_coordinator) {
       /* Go back to scanning */
@@ -998,14 +998,14 @@ turn_off(int keep_radio_on)
   if(keep_radio_on) {
     if(!sftiot_radio_on) {
       sftiot_radio_on = 1;
-      sftiot_radio_on_since = clock_time();
+      sftiot_radio_on_since = RTIMER_NOW();
     }
     NETSTACK_RADIO.on();
   } else {
     NETSTACK_RADIO.off();
     if(sftiot_radio_on) {
       sftiot_radio_on = 0;
-      sftiot_radio_duration += clock_time() - sftiot_radio_on_since;
+      sftiot_radio_duration += RTIMER_NOW() - sftiot_radio_on_since;
     }
   }
   return 1;
