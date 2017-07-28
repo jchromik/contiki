@@ -48,6 +48,7 @@ PROCESS_THREAD(jam_process, ev, data)
 
   memset(loop, 0xFF, LOOP_LEN);
   NETSTACK_RADIO_ASYNC.set_value(RADIO_PARAM_TX_MODE, RADIO_TX_MODE_LOOP);
+  NETSTACK_RADIO_ASYNC.set_value(RADIO_PARAM_CHANNEL, (uint8_t) 20)
   NETSTACK_RADIO_ASYNC.prepare(loop, LOOP_LEN);
   NETSTACK_RADIO_ASYNC.transmit();
 
